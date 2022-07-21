@@ -1,9 +1,22 @@
+const std = @import("std");
+const builtin = @import("builtin");
+const c = @import("c.zig");
 const Self = @This();
+const Imp = @import("Imp.zig");
+const Ivar = @import("Ivar.zig");
+const Method = @import("Method.zig");
+const Object = @import("Object.zig");
+const Protocol = @import("Protocol.zig");
+const Sel = @import("Sel.zig");
+const Error = @import("error.zig").Error;
+const objc = @import("objc.zig");
+const wants_runtime_safety = std.debug.runtime_safety;
+
 _inner: c.Class,
 
 // TODO wrap bool returns to error type
 pub fn addIvar(self: Self, name: [:0]const u8, size: usize, alignment: u8, types: [:0]const u8) bool {
-    return c.class_addIvar(self._inner, name.ptr, size, alignment, types.ptr) == YES;
+    return c.class_addIvar(self._inner, name.ptr, size, alignment, types.ptr) == objc.YES;
 }
 pub fn addMethod(self: Self, name: Sel, imp: Imp, types: [:0]const u8) bool {
     // First and second arguments must be `self` and `_cmd` (encoded as `@` and `:`)
@@ -11,7 +24,7 @@ pub fn addMethod(self: Self, name: Sel, imp: Imp, types: [:0]const u8) bool {
         std.debug.assert(types[1] == '@');
         std.debug.assert(types[2] == ':');
     }
-    return c.class_addMethod(self._inner, name._inner, imp._inner, types.ptr) == YES;
+    return c.class_addMethod(self._inner, name._inner, imp._inner, types.ptr) == objc.YES;
 }
 // TODO wrap property_attribute
 pub fn addProperty(
@@ -19,13 +32,13 @@ pub fn addProperty(
     name: [:0]const u8,
     attributes: []const c.objc_property_attribute_t,
 ) bool {
-    return c.class_addProperty(self._inner, name.ptr, attributes.ptr, @truncate(u32, attributes.len)) == YES;
+    return c.class_addProperty(self._inner, name.ptr, attributes.ptr, @truncate(u32, attributes.len)) == objc.YES;
 }
 pub fn addProtocol(self: Self, protocol: *Protocol) bool {
-    return c.class_addProtocol(self._inner, &protocol._inner) == YES;
+    return c.class_addProtocol(self._inner, &protocol._inner) == objc.YES;
 }
 pub fn conformsToProtocol(self: Self, protocol: *Protocol) bool {
-    return c.class_conformsToProtocol(self._inner, &protocol._inner) == YES;
+    return c.class_conformsToProtocol(self._inner, &protocol._inner) == objc.YES;
 }
 // TODO: maybe introduce explicit nullability
 /// Returned slice is null-terminated, but this is not indicated in the type to avoid
@@ -78,6 +91,9 @@ pub fn createInstance(self: *Self, extra_bytes: usize) Object {
 pub fn createInstanceFromZone() void {
     std.debug.todo("fn createInstanceFromZone");
 }
+pub fn getClass(name: [:0]const u8) Self {
+    return Self{ ._inner = c.objc_getClass(name.ptr) };
+}
 pub fn getClassMethod(self: Self, name: Sel) Error!Method {
     const method = c.class_getClassMethod(self._inner, name._inner) orelse
         return error.ClassDoesNotContainMethod;
@@ -94,30 +110,48 @@ pub fn getInstanceMethod(self: Self, name: Sel) Error!Method {
         return error.ClassDoesNotContainMethod;
     return Method{ ._inner = method };
 }
-pub fn getClass(name: [:0]const u8) Class {
-    return Class{ ._inner = c.objc_getClass(name.ptr) };
+pub fn msgSend(comptime T: type, self: Self, op: Sel, args: anytype) T {
+    const args_meta = @typeInfo(@TypeOf(args)).Struct.fields;
+    const FnTy = comptime blk: {
+        break :blk switch (args_meta.len) {
+            0 => fn (c.Class, c.SEL) callconv(.C) T,
+            1 => fn (c.Class, c.SEL, args_meta[0].field_type) callconv(.C) T,
+            2 => fn (c.Class, c.SEL, args_meta[0].field_type, args_meta[1].field_type) callconv(.C) T,
+            3 => fn (c.Class, c.SEL, args_meta[0].field_type, args_meta[1].field_type, args_meta[2].field_type) callconv(.C) T,
+            4 => fn (c.Class, c.SEL, args_meta[0].field_type, args_meta[1].field_type, args_meta[2].field_type, args_meta[3].field_type) callconv(.C) T,
+            else => @compileError("Unsupported number of args in msgSend"),
+        };
+    };
+
+    const Fn = switch (builtin.zig_backend) {
+        .stage1 => FnTy,
+        else => *const FnTy,
+    };
+    var func = @ptrCast(Fn, c.objc_msgSend);
+
+    return @call(.{}, func, .{ self._inner, op._inner } ++ args);
 }
 
 // zig fmt: off
-    pub fn getInstanceSize() void { std.debug.todo("fn getInstanceSize"); }
-    pub fn getInstanceVariable() void { std.debug.todo("fn getInstanceVariable"); }
-    pub fn getIvarLayout() void { std.debug.todo("fn getIvarLayout"); }
-    pub fn getMethodImplementation() void { std.debug.todo("fn getMethodImplementation"); }
-    pub fn getMethodImplementationStret() void { std.debug.todo("fn getMethodImplementationStret"); }
-    pub fn getName() void { std.debug.todo("fn getName"); }
-    pub fn getProperty() void { std.debug.todo("fn getProperty"); }
-    pub fn getSuperclass() void { std.debug.todo("fn getSuperclass"); }
-    pub fn getVersion() void { std.debug.todo("fn getVersion"); }
-    pub fn getWeakIvarLayout() void { std.debug.todo("fn getWeakIvarLayout"); }
-    pub fn isMetaClass() void { std.debug.todo("fn isMetaClass"); }
-    pub fn replaceMethod() void { std.debug.todo("fn replaceMethod"); }
-    pub fn replaceProperty() void { std.debug.todo("fn replaceProperty"); }
-    pub fn respondsToSelector() void { std.debug.todo("fn respondsToSelector"); }
-    pub fn setIvarLayout() void { std.debug.todo("fn setIvarLayout"); }
-    pub fn setSuperclass() void { std.debug.todo("fn setSuperclass"); }
-    pub fn setVersion() void { std.debug.todo("fn setVersion"); }
-    pub fn setWeakIvarLayout() void { std.debug.todo("fn setWeakIvarLayout"); }
-    // zig fmt: on
+pub fn getInstanceSize() void { std.debug.todo("fn getInstanceSize"); }
+pub fn getInstanceVariable() void { std.debug.todo("fn getInstanceVariable"); }
+pub fn getIvarLayout() void { std.debug.todo("fn getIvarLayout"); }
+pub fn getMethodImplementation() void { std.debug.todo("fn getMethodImplementation"); }
+pub fn getMethodImplementationStret() void { std.debug.todo("fn getMethodImplementationStret"); }
+pub fn getName() void { std.debug.todo("fn getName"); }
+pub fn getProperty() void { std.debug.todo("fn getProperty"); }
+pub fn getSuperclass() void { std.debug.todo("fn getSuperclass"); }
+pub fn getVersion() void { std.debug.todo("fn getVersion"); }
+pub fn getWeakIvarLayout() void { std.debug.todo("fn getWeakIvarLayout"); }
+pub fn isMetaClass() void { std.debug.todo("fn isMetaClass"); }
+pub fn replaceMethod() void { std.debug.todo("fn replaceMethod"); }
+pub fn replaceProperty() void { std.debug.todo("fn replaceProperty"); }
+pub fn respondsToSelector() void { std.debug.todo("fn respondsToSelector"); }
+pub fn setIvarLayout() void { std.debug.todo("fn setIvarLayout"); }
+pub fn setSuperclass() void { std.debug.todo("fn setSuperclass"); }
+pub fn setVersion() void { std.debug.todo("fn setVersion"); }
+pub fn setWeakIvarLayout() void { std.debug.todo("fn setWeakIvarLayout"); }
+// zig fmt: on
 
 test "static analysis" {
     std.testing.refAllDecls(@This());

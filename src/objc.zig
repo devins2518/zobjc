@@ -1,36 +1,18 @@
-// TODO: deprecation checks
 const std = @import("std");
 const builtin = @import("builtin");
 pub const c = @import("c.zig");
-pub const Error = @import("error.zig").Error;
-const wants_runtime_safety = std.debug.runtime_safety;
+const Class = @import("Class.zig");
+const Imp = @import("Imp.zig");
+const Ivar = @import("Ivar.zig");
+const Method = @import("Method.zig");
+const Object = @import("Object.zig");
+const Protocol = @import("Protocol.zig");
+const Sel = @import("Sel.zig");
+const Error = @import("error.zig").Error;
 
 pub const BOOL = c.BOOL;
 pub const YES = if (c.__OBJC_BOOL_IS_BOOL == 1) true else 1;
 pub const NO = if (c.__OBJC_BOOL_IS_BOOL == 1) false else 0;
-
-// Probably shoudld be part of Class
-pub fn msgSend(comptime T: type, self: Class, op: Sel, args: anytype) T {
-    const args_meta = @typeInfo(@TypeOf(args)).Struct.fields;
-    const FnTy = comptime blk: {
-        break :blk switch (args_meta.len) {
-            0 => fn (c.Class, c.SEL) callconv(.C) T,
-            1 => fn (c.Class, c.SEL, args_meta[0].field_type) callconv(.C) T,
-            2 => fn (c.Class, c.SEL, args_meta[0].field_type, args_meta[1].field_type) callconv(.C) T,
-            3 => fn (c.Class, c.SEL, args_meta[0].field_type, args_meta[1].field_type, args_meta[2].field_type) callconv(.C) T,
-            4 => fn (c.Class, c.SEL, args_meta[0].field_type, args_meta[1].field_type, args_meta[2].field_type, args_meta[3].field_type) callconv(.C) T,
-            else => @compileError("Unsupported number of args in msgSend"),
-        };
-    };
-
-    const Fn = switch (builtin.zig_backend) {
-        .stage1 => FnTy,
-        else => *const FnTy,
-    };
-    var func = @ptrCast(Fn, c.objc_msgSend);
-
-    return @call(.{}, func, .{ self._inner, op._inner } ++ args);
-}
 
 // zig fmt: off
 pub fn addExceptionHandler() void { std.debug.todo("fn addExceptionHandler"); }

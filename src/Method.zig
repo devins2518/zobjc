@@ -1,3 +1,14 @@
+const std = @import("std");
+const c = @import("c.zig");
+const Self = @This();
+const Class = @import("Class.zig");
+const Imp = @import("Imp.zig");
+const Ivar = @import("Ivar.zig");
+const Object = @import("Object.zig");
+const Protocol = @import("Protocol.zig");
+const Sel = @import("Sel.zig");
+const objc = @import("objc.zig");
+
 _inner: c.Method,
 
 // zig fmt: off
@@ -15,3 +26,7 @@ pub fn invoke() void { std.debug.todo("fn invoke"); }
 pub fn invokeStret() void { std.debug.todo("fn invokeStret"); }
 pub fn setImplementation() void { std.debug.todo("fn setImplementation"); }
 // zig fmt: on
+
+test "static analysis" {
+    std.testing.refAllDecls(@This());
+}
