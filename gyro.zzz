@@ -1,0 +1,11 @@
+pkgs:
+  zobjc:
+    version: 0.0.1
+    description: Zig bindings for the Objective-C runtime.
+    license: MIT
+    source_url: "https://github.com/devins2518/zobc"
+    root: src/lib.zig
+    files:
+      README.md
+      LICENSE
+      src/*.zig

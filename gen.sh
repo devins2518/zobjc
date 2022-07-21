@@ -1,16 +1,13 @@
 FILE=./src/raw.c
 FILE_ZIG=./src/c.zig
 
-rm $FILE
-touch $FILE
-
 OUT=""
 
 ROOT_DIR=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/objc
 
 for file in $(find $ROOT_DIR/*.h); do
     BASE=$(basename $file)
-    OUT="${OUT}#include \"objc/${BASE}\"\n"
+    OUT="${OUT}#include <objc/${BASE}>\n"
 done
 
 echo $OUT > $FILE
