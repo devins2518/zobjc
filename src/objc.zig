@@ -14,6 +14,34 @@ pub const BOOL = c.BOOL;
 pub const YES = if (c.__OBJC_BOOL_IS_BOOL == 1) true else 1;
 pub const NO = if (c.__OBJC_BOOL_IS_BOOL == 1) false else 0;
 
+// Taken from: https://github.com/hazeycode/zig-objcrt/blob/main/src/message.zig
+pub fn msgSend(comptime ReturnType: type, target: anytype, selector: Sel, args: anytype) ReturnType {
+    const Fn = comptime blk: {
+        const target_type = @TypeOf(target);
+        const inner_type = @TypeOf(target._inner);
+        if ((target_type == Object or target_type == Class) == false) @compileError("msgSend target should be of type id or Class");
+
+        const args_meta = @typeInfo(@TypeOf(args)).Struct.fields;
+        const FnType = switch (args_meta.len) {
+            0 => fn (inner_type, c.SEL) ReturnType,
+            1 => fn (inner_type, c.SEL, args_meta[0].field_type) ReturnType,
+            2 => fn (inner_type, c.SEL, args_meta[0].field_type, args_meta[1].field_type) ReturnType,
+            3 => fn (inner_type, c.SEL, args_meta[0].field_type, args_meta[1].field_type, args_meta[2].field_type) ReturnType,
+            4 => fn (inner_type, c.SEL, args_meta[0].field_type, args_meta[1].field_type, args_meta[2].field_type, args_meta[3].field_type) ReturnType,
+            else => @compileError("Unsupported number of args: add more variants in zobjc/src/objc.zig"),
+        };
+        _ = FnType;
+
+        break :blk switch (builtin.zig_backend) {
+            .stage1 => FnType,
+            else => *const FnType,
+        };
+    };
+    var func = @ptrCast(Fn, c.objc_msgSend);
+
+    return @call(.{}, func, .{ target._inner, selector._inner } ++ args);
+}
+
 // zig fmt: off
 pub fn addExceptionHandler() void { std.debug.todo("fn addExceptionHandler"); }
 pub fn addLoadImageFunc() void { std.debug.todo("fn addLoadImageFunc"); }
