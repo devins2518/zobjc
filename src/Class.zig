@@ -12,12 +12,13 @@ const Error = @import("error.zig").Error;
 const objc = @import("objc.zig");
 const wants_runtime_safety = std.debug.runtime_safety;
 
-_inner: c.Class,
+_inner: innerTy,
 
 // TODO wrap bool returns to error type
 pub fn addIvar(self: Self, name: [:0]const u8, size: usize, alignment: u8, types: [:0]const u8) bool {
     return c.class_addIvar(self._inner, name.ptr, size, alignment, types.ptr) == objc.YES;
 }
+// TODO: automatically generate types at comptime
 pub fn addMethod(self: Self, name: Sel, imp: Imp, types: [:0]const u8) bool {
     // First and second arguments must be `self` and `_cmd` (encoded as `@` and `:`)
     if (wants_runtime_safety) {
@@ -36,6 +37,9 @@ pub fn addProperty(
 }
 pub fn addProtocol(self: Self, protocol: *Protocol) bool {
     return c.class_addProtocol(self._inner, &protocol._inner) == objc.YES;
+}
+pub fn allocateClassPair(superclass: Self, name: [:0]const u8, extra_bytes: usize) Self {
+    return Self{ ._inner = c.objc_allocateClassPair(superclass._inner, name.ptr, extra_bytes) };
 }
 pub fn conformsToProtocol(self: Self, protocol: *Protocol) bool {
     return c.class_conformsToProtocol(self._inner, &protocol._inner) == objc.YES;
@@ -110,26 +114,8 @@ pub fn getInstanceMethod(self: Self, name: Sel) Error!Method {
         return error.ClassDoesNotContainMethod;
     return Method{ ._inner = method };
 }
-pub fn msgSend(comptime T: type, self: Self, op: Sel, args: anytype) T {
-    const args_meta = @typeInfo(@TypeOf(args)).Struct.fields;
-    const FnTy = comptime blk: {
-        break :blk switch (args_meta.len) {
-            0 => fn (c.Class, c.SEL) callconv(.C) T,
-            1 => fn (c.Class, c.SEL, args_meta[0].field_type) callconv(.C) T,
-            2 => fn (c.Class, c.SEL, args_meta[0].field_type, args_meta[1].field_type) callconv(.C) T,
-            3 => fn (c.Class, c.SEL, args_meta[0].field_type, args_meta[1].field_type, args_meta[2].field_type) callconv(.C) T,
-            4 => fn (c.Class, c.SEL, args_meta[0].field_type, args_meta[1].field_type, args_meta[2].field_type, args_meta[3].field_type) callconv(.C) T,
-            else => @compileError("Unsupported number of args in msgSend"),
-        };
-    };
-
-    const Fn = switch (builtin.zig_backend) {
-        .stage1 => FnTy,
-        else => *const FnTy,
-    };
-    var func = @ptrCast(Fn, c.objc_msgSend);
-
-    return @call(.{}, func, .{ self._inner, op._inner } ++ args);
+pub fn registerClassPair(self: Self) void {
+    c.objc_registerClassPair(self._inner);
 }
 
 // zig fmt: off
@@ -152,6 +138,11 @@ pub fn setSuperclass() void { std.debug.todo("fn setSuperclass"); }
 pub fn setVersion() void { std.debug.todo("fn setVersion"); }
 pub fn setWeakIvarLayout() void { std.debug.todo("fn setWeakIvarLayout"); }
 // zig fmt: on
+
+pub const innerTy = c.Class;
+pub fn fromMsg(ret: innerTy) Self {
+    return Self{ ._inner = ret };
+}
 
 test "static analysis" {
     std.testing.refAllDecls(@This());

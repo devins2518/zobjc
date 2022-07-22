@@ -15,3 +15,4 @@ echo $OUT > $FILE
 zig translate-c $FILE > $FILE_ZIG
 
 sed -i '' 's/pub extern fn class_addProtocol(cls: Class, protocol: \[\*c]Protocol) BOOL;/pub extern fn class_addProtocol(cls: Class, protocol: *Protocol) BOOL;/g' $FILE_ZIG
+sed -i '' 's/pub const IMP = ?fn () callconv(.C) void;/pub const IMP = ?fn (...) callconv(.C) void;/g' $FILE_ZIG

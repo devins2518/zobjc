@@ -10,7 +10,7 @@ const Protocol = @import("Protocol.zig");
 const Sel = @import("Sel.zig");
 const objc = @import("objc.zig");
 
-_inner: c.id,
+_inner: innerTy,
 
 // zig fmt: off
 pub fn copy() void { std.debug.todo("fn copy"); }
@@ -23,11 +23,16 @@ pub fn getInstanceVariable() void { std.debug.todo("fn getInstanceVariable"); }
 pub fn getIvar() void { std.debug.todo("fn getIvar"); }
 pub fn isClass() void { std.debug.todo("fn isClass"); }
 pub fn setClass() void { std.debug.todo("fn setClass"); }
-pub fn setInstanceVaraible() void { std.debug.todo("fn setInstanceVaraible"); }
+pub fn setInstanceVariable() void { std.debug.todo("fn setInstanceVariable"); }
 pub fn setInstanceVariableWithStrongDefault() void { std.debug.todo("fn setInstanceVariableWithStrongDefault"); }
 pub fn setIvar() void { std.debug.todo("fn setIvar"); }
 pub fn setIvarWithStrongDefault() void { std.debug.todo("fn setIvarWithStrongDefault"); }
 // zig fmt: on
+
+pub const innerTy = c.id;
+pub fn fromMsg(ret: innerTy) Self {
+    return Self{ ._inner = ret };
+}
 
 test "static analysis" {
     std.testing.refAllDecls(@This());
